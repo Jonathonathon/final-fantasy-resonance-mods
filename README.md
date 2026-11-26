@@ -130,16 +130,23 @@ Expands Vision Mastery so unlocked Awakening spells and passives can be retained
 
 ### Buff Cap Removal (`BuffCapRemoval`)
 
-Removes the vanilla 5-turn stacking cap on extendable continuous effects (such as buffs and formations like Nichol's) so additional duration isn't wasted when stacking turns. All changes are applied at runtime to the `SKILL_GENERAL_DATA` table and never modify your save file.
+Lets player buffs and formations stack duration additively up to **99 turns** when re-cast instead of merely refreshing, while keeping everything 100% DataTable-driven (zero raw memory hacks, zero performance impact, and no save-file edits).
+
+#### How It Works
+In *FINAL FANTASY RESONANCE*, re-casting a buff natively **refreshes** its remaining duration via `max(current, castDuration)` rather than adding turns (`4 + 5` stays `5`), and live buff objects (`CPP_ContEffect`) only expose read-only getters to UE4SS Lua. Rather than using fragile raw C++ memory patching that can break on game updates, **Buff Cap Removal** uses the game's own native `ExtendEffectTurnById` DataTable effect (`SKILL_EFFECT_DATA #19014`) combined with raising the global `SKILL_GENERAL_DATA.effectMaxLifeTime` cap (vanilla `10` → `99`). Whenever a player casts a configured buff skill, the mod dynamically scopes `#19014` on `CPP_BtlSkillBeginDelVal` exclusively to **that skill's own buff effect(s)** before applying it — so re-casting one formation or buff only extends that specific buff (never unrelated buffs, enemy skills, or *God of Water's Blessing*'s vanilla behavior), with **no cap on how many buffs can be enabled**.
 
 #### Settings
-* **In-game (`Main Menu → Mods → Buff Cap Removal`, or `BuffCapRemoval/config.ini`):**
+* **In-game (`Main Menu → Mods → Buff Cap Removal`):**
   * **Max Buff Duration** (`MaxBuffDuration`):
-    * **`5`** *(default)*: Vanilla 5-turn maximum duration cap.
-    * **`99`**: Allows extendable continuous effects to stack up to **99 turns**.
-
-> [!NOTE]
-> `SKILL_GENERAL_DATA.effectMaxLifeTime` is a global duration cap shared by any extendable continuous effect (`isExtendLifeTurn = true`). Setting it to `99` affects buffs/formations as well as any extendable debuffs or status effects that share that cap.
+    * **`5`** *(default)*: Vanilla behavior (restores all DataTables cleanly).
+    * **`99`**: Raises the global duration cap to **99 turns** and enables additive turn stacking on all buffs listed in `ExtendedEffects`.
+  * **Spell Duration on Cast** (`SpellDurationOnCast`):
+    * **Standard (`standard`)** *(default)*: Buffs are cast with their normal base turn durations.
+    * **Unlimited (`unlimited`)**: Every player buff and formation (excluding Defend) is cast directly with **99 turns** (also raises the global duration cap to 99 so casts aren't clamped). Debuffs, bad statuses, and enemy-only buffs are unaffected.
+* **Customizing Affected Buffs (`BuffCapRemoval/config.ini`):**
+  * **`ExtendedEffects`**: Comma-separated list of Effect IDs (or friendly alias names) to enable additive stacking for. **All 31 player buff & formation effects are enabled by default** — simply remove any IDs you prefer to keep vanilla. Changes are picked up automatically within 1 second even while the game is running.
+  * **`TurnsAddedPerRecast`**: Number of turns added per re-cast (default `3`; set to `0` to automatically match each buff's own base duration).
+  * A complete commented **Buff Effect ID Reference List** (covering Nichol's Formations & Tactics, Hastega/Haste, Protectga/Protect, Shellga/Shell, Manaward, Bravery, Faith, Regen/Healing Ruby, Reflect, and character stance buffs like *Hone Senses*, *Eminent Casting*, *Concentrate*, *Gut Rip*, *Placidity*, *Sage's Eye*, etc.) is included directly inside `BuffCapRemoval/config.ini` so you never have to hunt for IDs.
 
 ---
 
