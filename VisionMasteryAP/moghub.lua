@@ -49,7 +49,9 @@ local cachedAwakeningReq = {}       -- vid -> { [awkLv] = masteryPoint }
 local cachedAllVisionSkills = {}    -- skillId -> paramType (spells only, never Awakening passives)
 local cachedAllAwakeningPassives = {} -- passiveSkillId -> true
 local injectedByVision = {}         -- vid -> { [skillId] = true }
-local injectedAny = {}              -- fallback set when list VisionId cannot be read
+local injectedAny = {}              -- all injected skillIds across all Visions
+local injectedExclusive = {}        -- injected skillIds that NEVER appear in any vanilla Synchro table
+local hiddenEntryWidgets = {}       -- widgetAddr -> true (for unhiding recycled widgets)
 local cachedSynchroReq = {}         -- vid -> { [slv] = masteryPoint }
 local cachedMaxSynchroLv = {}       -- vid -> highest slv in Synchro table (e.g. MR 9)
 
@@ -472,6 +474,7 @@ local function applyPatches(force)
     --   (at unchanged AP cost).
     local newInjectedByVision = {}
     local newInjectedAny = {}
+    local vanillaSynchroAny = {}
     local existingSynchroSkills = {} -- vid -> { [skillId] = true }
     kit.tables.rows(MASTERY_STRUCT, function(row, rowName, tbl)
         if not tbl.path:find("Synchro") then return end
@@ -499,6 +502,7 @@ local function applyPatches(force)
             local op = origSynchro[key]
             if op.param1 and op.param1 > 0 then
                 existingSynchroSkills[vid][op.param1] = true
+                vanillaSynchroAny[op.param1] = true
             end
             -- Record vanilla Synchro ActiveSkills (parameterType == 1, e.g. Deathblow)
             if op.paramType == 1 and op.param1 and op.param1 >= 200000 then
@@ -606,6 +610,13 @@ local function applyPatches(force)
         end
     end
 
+    local newInjectedExclusive = {}
+    for sid in pairs(newInjectedAny) do
+        if not vanillaSynchroAny[sid] then
+            newInjectedExclusive[sid] = true
+        end
+    end
+
     cachedVisionSpells = visionSpells
     cachedAwakeningPassives = awakeningPassives
     cachedSynchroSpells = synchroSpells
@@ -614,6 +625,7 @@ local function applyPatches(force)
     cachedAllAwakeningPassives = allAwakeningPassiveIds
     injectedByVision = newInjectedByVision
     injectedAny = newInjectedAny
+    injectedExclusive = newInjectedExclusive
     cachedSynchroReq = synchroReq
     cachedMaxSynchroLv = maxSynchroLv
 
@@ -881,8 +893,28 @@ local function getListVisionId(listW)
     return vid
 end
 
+local function getEntryVisionId(entry)
+    local vid = getListVisionId(entry)
+    if vid > 0 then return vid end
+    pcall(function()
+        local cur = entry:GetOuter()
+        local guard = 0
+        while kit.valid(cur) and guard < 6 do
+            guard = guard + 1
+            local id = getListVisionId(cur)
+            if id > 0 then
+                vid = id
+                return
+            end
+            cur = cur:GetOuter()
+        end
+    end)
+    return vid
+end
+
 local function hideEntryWidget(w)
     if not kit.valid(w) then return end
+    pcall(function() hiddenEntryWidgets[w:GetAddress()] = true end)
     pcall(function()
         if w:GetVisibility() ~= 1 then
             w:SetVisibility(1) -- ESlateVisibility::Collapsed
@@ -894,6 +926,27 @@ local function hideEntryWidget(w)
         if kit.valid(w.PathButton) then
             w.PathButton:SetIsEnabled(false)
             w.PathButton:SetVisibility(1)
+        end
+    end)
+end
+
+local function unhideEntryWidget(w)
+    if not kit.valid(w) then return end
+    local addr = nil
+    pcall(function() addr = w:GetAddress() end)
+    if not addr or not hiddenEntryWidgets[addr] then return end
+    hiddenEntryWidgets[addr] = nil
+    pcall(function()
+        if w:GetVisibility() == 1 then
+            w:SetVisibility(0) -- ESlateVisibility::Visible
+        end
+    end)
+    pcall(function() w:SetIsEnabled(true) end)
+    pcall(function() w.IsEnabled = true end)
+    pcall(function()
+        if kit.valid(w.PathButton) then
+            w.PathButton:SetIsEnabled(true)
+            w.PathButton:SetVisibility(0)
         end
     end)
 end
@@ -917,7 +970,17 @@ local function hideInjectedMasteryEntries()
                 if eCount == 0 and wCount == 0 then return end
 
                 local vid = getListVisionId(listW)
-                local hideSet = (vid > 0 and injectedByVision[vid]) or injectedAny
+                local hideSet = nil
+                if vid > 0 then
+                    hideSet = injectedByVision[vid]
+                    if not hideSet then return end
+                else
+                    -- Never fall back to global injectedAny, which can match vanilla Synchro
+                    -- Mastery skills on other Visions (e.g. Cecil's MR 5); only hide skills
+                    -- that never appear in any vanilla Synchro Mastery table.
+                    hideSet = injectedExclusive
+                end
+                if not next(hideSet) then return end
 
                 local hiddenAddrs = {}
                 local keptEntries = {}
@@ -940,6 +1003,7 @@ local function hideInjectedMasteryEntries()
                                 end
                             end)
                         else
+                            if kit.valid(w) then unhideEntryWidget(w) end
                             keptEntries[#keptEntries + 1] = item
                         end
                     end
@@ -974,6 +1038,7 @@ local function hideInjectedMasteryEntries()
                             hideEntryWidget(w)
                             pcall(function() w:RemoveFromParent() end)
                         else
+                            if kit.valid(w) then unhideEntryWidget(w) end
                             keptWidgets[#keptWidgets + 1] = w
                         end
                     end
@@ -989,13 +1054,26 @@ local function hideInjectedMasteryEntries()
         end
     end
 
-    -- Fallback sweep on standalone WBP_VisionSynchroMasteryEntry_C widgets (e.g. Level Up / detail panels)
+    -- Fallback sweep on standalone WBP_VisionSynchroMasteryEntry_C widgets (e.g. Level Up / detail panels).
+    -- Scoped by VisionId when available; otherwise restricted to injectedExclusive so vanilla
+    -- Synchro Mastery bonuses on any Vision (like Cecil's MR 5) are never collapsed.
     local entries = FindAllOf("WBP_VisionSynchroMasteryEntry_C") or {}
     for _, entry in ipairs(entries) do
         if kit.valid(entry) and not entry:GetFullName():find("Default__", 1, true) then
             local sid = getEntrySkillId(entry)
-            if sid > 0 and injectedAny[sid] then
-                hideEntryWidget(entry)
+            if sid > 0 then
+                local vid = getEntryVisionId(entry)
+                local shouldHide = false
+                if vid > 0 then
+                    shouldHide = (injectedByVision[vid] and injectedByVision[vid][sid]) == true
+                else
+                    shouldHide = (injectedExclusive[sid] == true)
+                end
+                if shouldHide then
+                    hideEntryWidget(entry)
+                else
+                    unhideEntryWidget(entry)
+                end
             end
         end
     end

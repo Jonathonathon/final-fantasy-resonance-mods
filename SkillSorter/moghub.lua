@@ -883,7 +883,45 @@ local function getSavedBattleActionId(unitId)
     return foundId
 end
 
-local function focusBattleIndex(actionList, pm, lv, idx0)
+local function findDisplayedEntryWidget(lv, idx0, targetSkillId)
+    if not kit.valid(lv) then return nil end
+    local found = nil
+    pcall(function()
+        local displayed = lv:GetDisplayedEntryWidgets()
+        if not displayed then return end
+        local list = {}
+        if type(displayed) == "table" then
+            for _, v in ipairs(displayed) do
+                local okU, o = pcall(function() return v:get() end)
+                o = okU and o or v
+                if kit.valid(o) then list[#list + 1] = o end
+            end
+        else
+            displayed:ForEach(function(_, v)
+                local o = v:get()
+                if kit.valid(o) then list[#list + 1] = o end
+            end)
+        end
+        local entryLib = StaticFindObject("/Script/UMG.Default__UserObjectListEntryLibrary")
+        if not kit.valid(entryLib) then return end
+        for _, w in ipairs(list) do
+            local item = entryLib:GetListItemObject(w)
+            if kit.valid(item) then
+                local eIdx = nil
+                pcall(function() eIdx = num(item.EntryIndex) end)
+                local sid = nil
+                pcall(function() sid = num(item.ActionKey.ID) end)
+                if (eIdx ~= nil and eIdx == idx0) or (targetSkillId and sid == targetSkillId) then
+                    found = w
+                    return
+                end
+            end
+        end
+    end)
+    return found
+end
+
+local function focusBattleIndex(actionList, pm, lv, idx0, targetSkillId)
     idx0 = math.max(0, idx0 or 0)
     pcall(function()
         local vm = kit.valid(actionList) and actionList.VM_BtlCmd
@@ -899,6 +937,47 @@ local function focusBattleIndex(actionList, pm, lv, idx0)
     if kit.valid(pm) then
         focusToIndex(pm, idx0)
     end
+
+    -- Give real Slate keyboard/button focus to the spawned WBP_BtlCmd_SkillEntry_C widget
+    -- once it is realized in the virtualized ListView, so Confirm (F) works immediately
+    -- and Up/Down navigates from this row instead of jumping back to index 0.
+    local entryW = findDisplayedEntryWidget(lv, idx0, targetSkillId)
+    if kit.valid(entryW) then
+        if kit.valid(pm) then
+            if not safeCall(pm, "SetFocuedItemWidget", entryW, 0) then
+                safeCall(pm, "SetFocuedItemWidget", entryW)
+            end
+        end
+        local pc = kit.game and kit.game.playerController and kit.game.playerController()
+        if kit.valid(pc) then
+            pcall(function() entryW:SetUserFocus(pc) end)
+        end
+        pcall(function() entryW:SetKeyboardFocus() end)
+        return isWidgetFocused(entryW)
+    end
+    return false
+end
+
+local function scheduleBattleFocus(actionList, pm, lv, cache, idx0, targetSkillId, forceDelayed)
+    cache.focusGen = (cache.focusGen or 0) + 1
+    local gen = cache.focusGen
+    local focusedNow = focusBattleIndex(actionList, pm, lv, idx0, targetSkillId)
+    if not kit.after then return end
+    if not forceDelayed and focusedNow and idx0 == 0 then return end
+
+    local function retry(remaining)
+        if not kit.valid(actionList) or cache.focusGen ~= gen then return end
+        local vis = false
+        pcall(function() vis = actionList:IsVisible() end)
+        if not vis then return end
+
+        local ok = focusBattleIndex(actionList, pm, lv, idx0, targetSkillId)
+        if not ok and remaining > 0 then
+            kit.after(60, function() retry(remaining - 1) end, "battleFocusRestore2")
+        end
+    end
+
+    kit.after(50, function() retry(idx0 > 0 and 1 or 0) end, "battleFocusRestore")
 end
 
 -- Play the native combat menu selection "beep" using SelectSoundTag from Battle Command DA
@@ -1188,6 +1267,7 @@ local function applyBattleEntries(actionList, pm, lv, cache, entries, targetFocu
     local count = #entries
     if count == 0 then return false end
     local focusIdx = math.min(math.max(0, targetFocusIdx0 or 0), count - 1)
+    local targetSkillId = entries[focusIdx + 1] and entries[focusIdx + 1].id or nil
 
     -- 1. Update ActionKeyList on WBP_BtlCmd_ActionList_C
     pcall(function()
@@ -1264,15 +1344,7 @@ local function applyBattleEntries(actionList, pm, lv, cache, entries, targetFocu
             pcall(function() lv:RequestRefresh() end)
         end
 
-        focusBattleIndex(actionList, pm, lv, focusIdx)
-        -- Re-apply focus after one Slate layout tick in case RegenerateAllEntries or
-        -- the game's native cursor memory moves the highlight on the next frame
-        if (forceDelayedFocus or focusIdx > 0) and kit.after then
-            local savedAl, savedPm, savedLv, savedIdx = actionList, pm, lv, focusIdx
-            kit.after(50, function()
-                focusBattleIndex(savedAl, savedPm, savedLv, savedIdx)
-            end, "battleFocusRestore")
-        end
+        scheduleBattleFocus(actionList, pm, lv, cache, focusIdx, targetSkillId, forceDelayedFocus)
     end)
 
     return true
@@ -1510,7 +1582,7 @@ local function processBattleActionList(actionList, unitId, unitKey, pageDelta)
         applyBattleEntries(actionList, pm, lv, cache, targetEntries, targetFocusIdx0, lockFocus)
         cache.lastAppliedIds = targetIds
         if lockFocus then
-            cache.restoreLockUntil = os.clock() + 0.09
+            cache.restoreLockUntil = os.clock() + (targetFocusIdx0 > 0 and 0.18 or 0.09)
         end
         updateSecondaryHeaderTitle(actionList, page.label)
 
@@ -1526,14 +1598,8 @@ local function processBattleActionList(actionList, unitId, unitKey, pageDelta)
             end
         end
     elseif justFocused and hasRestoredTarget then
-        focusBattleIndex(actionList, pm, lv, targetFocusIdx0)
-        if kit.after then
-            local savedAl, savedPm, savedLv, savedIdx = actionList, pm, lv, targetFocusIdx0
-            kit.after(50, function()
-                focusBattleIndex(savedAl, savedPm, savedLv, savedIdx)
-            end, "battleFocusRestore")
-        end
-        cache.restoreLockUntil = os.clock() + 0.09
+        scheduleBattleFocus(actionList, pm, lv, cache, targetFocusIdx0, restoreSkillId, true)
+        cache.restoreLockUntil = os.clock() + (targetFocusIdx0 > 0 and 0.18 or 0.09)
     else
         cache.lastAppliedIds = targetIds
         -- Continuously remember the currently highlighted skill & page while this list has focus
