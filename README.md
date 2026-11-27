@@ -139,7 +139,7 @@ Brings the same organization tools as **Skill Sorter** to your inventory, equipm
     * **Quantity (High–Low)**: Most stocked items first, tie-broken alphabetically.
     * **Value / Price (High–Low)**: Highest value items first, tie-broken alphabetically.
     * **Vanilla**: Restores the game's default `SortId` order and clears saved custom order.
-  * **Sort Equipment Picker** (`SortEquipPicker`, default `On`): Applies your saved order (or selected Auto-Sort Mode) inside the **Equipment & Abilities** weapon, armor, and accessory picker (always keeping any Unequip/Remove row pinned at the top).
+  * **Sort Equipment Picker** (`SortEquipPicker`, default `On`): Applies your saved item order inside the **Equipment & Abilities** weapon, armor, and accessory picker (keeps any Unequip/Remove row pinned at the top, and respects Vanilla order when unsorted).
   * **Paginated Battle Items** (`PaginatedBattleItems`, default `On`): Enables `Q` / `E` (or `LB` / `RB`) category paging inside **Battle → Item / Throw** (`All`, `Heal / Revive`, `Status Cure`, `Offensive / Throw`, `Other`), compatible with *Remember Cursor Location*.
 * **Custom Keyboard Keybinds (`ItemSorter/config.ini`):**
   For non-QWERTY layouts or personal preference, you can set `PickDropKey`, `CancelKey`, `AutoSortKey`, `PrevPageKey`, and `NextPageKey`.

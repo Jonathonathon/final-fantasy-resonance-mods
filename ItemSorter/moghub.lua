@@ -22,7 +22,7 @@ local cfg = mod:settings{
         label = "Sort Equipment Picker",
         type = "toggle",
         default = true,
-        help = "Apply your saved item order (or selected Auto-Sort Mode) inside the Equipment & Abilities weapon, armor, and accessory picker.",
+        help = "Apply your saved item order inside the Equipment & Abilities weapon, armor, and accessory picker (respects Vanilla when unsorted).",
     },
     {
         key = "PaginatedBattleItems",
@@ -1980,7 +1980,7 @@ local function handleEquipPickerSorting()
                     local needsCheck = (cache.lastOrderVer ~= orderVersion)
                         or (not sameIdList(currentIds, cache.lastAppliedIds))
                     if needsCheck then
-                        local sortedIds = getSortedItemIds(currentIds, false, true, qtyOverride)
+                        local sortedIds = getSortedItemIds(currentIds, false, false, qtyOverride)
                         if not sameIdList(currentIds, sortedIds) then
                             local keepId = getFocusedInventoryItemId(pm, lv, currentIds)
                             local reordered = reorderEntriesByIds(rawEntries, sortedIds)
