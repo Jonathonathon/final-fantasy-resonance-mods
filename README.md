@@ -7,6 +7,7 @@ A collection of quality-of-life and gameplay plugins for **FINAL FANTASY RESONAN
 | Mod | Folder | Summary |
 | --- | --- | --- |
 | **Skill Sorter** | `SkillSorter` | Manually reorder skills in the Pause Menu, auto-sort by type & power, and filter skills by category pages in combat. |
+| **Item Sorter** | `ItemSorter` | Manually reorder items in the Pause Menu, auto-sort by Alphabetical / Type & Power / Quantity / Price (grouped by category), sort the Equipment picker, and optionally page Battle Items. |
 | **Vision Spells & AP Expansion** | `VisionMasteryAP` | Unlock Vision Awakening spells via Synchro Mastery (`10 AP` or `Permanent` 0 AP) and make Awakening passive abilities individually equippable. |
 | **Buff Cap Removal** | `BuffCapRemoval` | Raise the maximum stackable buff/effect turn duration cap in combat from `5` turns up to `99` turns. |
 
@@ -60,7 +61,7 @@ Before installing any of these mods, you must have the following installed:
 ### 3. Install These Mods
 
 1. Download this repository by clicking the green **`<> Code`** button at the top of this page and selecting **Download ZIP** (then extract it).
-2. Copy the `SkillSorter`, `VisionMasteryAP`, and/or `BuffCapRemoval` folders into your UE4SS `Mods` folder:
+2. Copy the `SkillSorter`, `ItemSorter`, `VisionMasteryAP`, and/or `BuffCapRemoval` folders into your UE4SS `Mods` folder:
    ```text
    <Game Folder>\FFRS\Binaries\Win64\ue4ss\Mods\
    ```
@@ -77,6 +78,10 @@ Before installing any of these mods, you must have the following installed:
                        │   ├── moghub.ini
                        │   ├── moghub.lua
                        │   └── config.ini
+                       ├── ItemSorter\
+                       │   ├── moghub.ini
+                       │   ├── moghub.lua
+                       │   └── config.ini
                        ├── VisionMasteryAP\
                        │   ├── moghub.ini
                        │   ├── moghub.lua
@@ -86,7 +91,7 @@ Before installing any of these mods, you must have the following installed:
                            ├── moghub.lua
                            └── config.ini
    ```
-4. Launch **FINAL FANTASY RESONANCE**, open **Main Menu → Mods**, and confirm the installed mods (**Skill Sorter**, **Vision Spells & AP Expansion**, and/or **Buff Cap Removal**) appear in the list and are enabled.
+4. Launch **FINAL FANTASY RESONANCE**, open **Main Menu → Mods**, and confirm the installed mods (**Skill Sorter**, **Item Sorter**, **Vision Spells & AP Expansion**, and/or **Buff Cap Removal**) appear in the list and are enabled.
 
 ---
 
@@ -109,6 +114,34 @@ Lets you organize each character's skill list and browse abilities faster in bat
 * **In-game (`Main Menu → Mods → Skill Sorter`):**
   * **Paginated Abilities:** Toggles category paging in combat (`All`, `Physical`, `Heal`, `Magic`, `Buff / Debuff`, `Other`). Works with the game's *Remember Cursor Location* setting.
 * **Custom Keyboard Keybinds (`SkillSorter/config.ini`):**
+  For non-QWERTY layouts or personal preference, you can set `PickDropKey`, `CancelKey`, `AutoSortKey`, `PrevPageKey`, and `NextPageKey`.
+
+---
+
+### Item Sorter (`ItemSorter`)
+
+Brings the same organization tools as **Skill Sorter** to your inventory, equipment picker, and battle item menus. Custom item orders are saved automatically per save slot and applied across Pause Menu → Items, Equipment & Abilities, and Battle → Item / Throw.
+
+#### Controls
+
+| Action | Where | Keyboard | Controller |
+| --- | --- | --- | --- |
+| Pick up / Drop item | Pause Menu → Items | `R` | `X` (Xbox) / `Square` (PS) |
+| Cancel pick-up | Pause Menu → Items | `C` | `B` (Xbox) / `Circle` (PS) |
+| Auto-sort using selected mode, or restore Vanilla if already sorted *(press twice within 3s)* | Pause Menu → Items | `G` | `Y` (Xbox) / `Triangle` (PS) |
+| Previous / Next category page *(when enabled)* | Battle → Item / Throw | `Q` / `E` | `LB` / `RB` (Xbox) / `L1` / `R1` (PS) |
+
+#### Settings
+* **In-game (`Main Menu → Mods → Item Sorter`):**
+  * **Auto-Sort Mode** (`AutoSortMode`): Choose what order double-tapping `G` / `Y` applies (all non-Vanilla modes stay **grouped by category**: Consumables → Weapons → Armor → Accessories → Visions → Valuables → Artifacts):
+    * **Alphabetical (A–Z)** *(default)*: Case-insensitive alphabetical order within each category.
+    * **Type & Power**: Smart sort — Consumables grouped by role (Revive → HP Heal → MP Heal/Elixir → Status Cure → Buff → Offensive/Throw) then potency; Weapons & Armor grouped by subtype (Greatsword, Katana, Rod, Heavy Armor, Robe, etc.) then primary stat; Accessories by stat total & passives.
+    * **Quantity (High–Low)**: Most stocked items first, tie-broken alphabetically.
+    * **Value / Price (High–Low)**: Highest value items first, tie-broken alphabetically.
+    * **Vanilla**: Restores the game's default `SortId` order and clears saved custom order.
+  * **Sort Equipment Picker** (`SortEquipPicker`, default `On`): Applies your saved order (or selected Auto-Sort Mode) inside the **Equipment & Abilities** weapon, armor, and accessory picker (always keeping any Unequip/Remove row pinned at the top).
+  * **Paginated Battle Items** (`PaginatedBattleItems`, default `On`): Enables `Q` / `E` (or `LB` / `RB`) category paging inside **Battle → Item / Throw** (`All`, `Heal / Revive`, `Status Cure`, `Offensive / Throw`, `Other`), compatible with *Remember Cursor Location*.
+* **Custom Keyboard Keybinds (`ItemSorter/config.ini`):**
   For non-QWERTY layouts or personal preference, you can set `PickDropKey`, `CancelKey`, `AutoSortKey`, `PrevPageKey`, and `NextPageKey`.
 
 ---
@@ -153,6 +186,7 @@ In *FINAL FANTASY RESONANCE*, re-casting a buff natively **refreshes** its remai
 ## Uninstalling
 
 * **Skill Sorter:** Delete the `SkillSorter` folder from `FFRS\Binaries\Win64\ue4ss\Mods\`.
+* **Item Sorter:** Delete the `ItemSorter` folder from `FFRS\Binaries\Win64\ue4ss\Mods\`.
 * **Buff Cap Removal:** Delete the `BuffCapRemoval` folder from `FFRS\Binaries\Win64\ue4ss\Mods\` (no save data is modified).
 * **Vision Spells & AP Expansion:**
   > [!IMPORTANT]

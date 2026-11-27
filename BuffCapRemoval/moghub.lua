@@ -188,15 +188,10 @@ local function setExtenderParams(turnsAdd, targetIds)
         return true
     end
 
-    if kit.valid(extenderDT) and extenderRowName then
-        local okF, row = pcall(function() return extenderDT:FindRow(FName(extenderRowName)) end)
-        if okF and row then
-            local okA, res = pcall(applyToRow, row)
-            if okA and res then return true end
-        end
+    if kit.valid(extenderDT) then
         local updated = false
         pcall(function()
-            extenderDT:ForEachRow(function(rn, r)
+            extenderDT:ForEachRow(function(_, r)
                 if not updated and r.ID == EXTENDER_EFFECT_ID then
                     updated = applyToRow(r)
                 end
